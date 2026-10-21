@@ -1,0 +1,33 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: shashka
+      POSTGRES_PASSWORD: shashka
+      POSTGRES_DB: shashka
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shashka -d shashka"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  bot:
+    build: .
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://shashka:shashka@db:5432/shashka
+      BACKUP_STORAGE_PATH: /app/backups
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - backups:/app/backups
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  backups:

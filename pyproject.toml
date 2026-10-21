@@ -1,0 +1,44 @@
+[project]
+name = "shashka-tournament-bot"
+version = "1.0.0"
+description = "Telegram bot for offline checkers (shashka) tournament management"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "aiogram>=3.13,<4",
+    "sqlalchemy[asyncio]>=2.0.36,<3",
+    "asyncpg>=0.30,<1",
+    "alembic>=1.14,<2",
+    "pydantic-settings>=2.6,<3",
+    "networkx>=3.4,<4",
+    "psycopg[binary]>=3.2,<4",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3,<9",
+    "pytest-asyncio>=0.24,<1",
+    "ruff>=0.8,<1",
+    "aiosqlite>=0.20,<1",
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+src = ["app", "tests", "scripts"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["B008"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
