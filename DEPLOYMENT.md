@@ -19,6 +19,23 @@ Do not commit `.env`.
 
 Create the bot with BotFather, disable privacy mode if the group should see ordinary messages, and promote the bot to group admin with **Pin messages** enabled. Ban, delete, and anonymous-admin rights are unnecessary.
 
+## DigitalOcean App Platform
+
+`.do/app.yaml` describes the app. The component is a web service so the health check on `GET /` can pass. The process also polls Telegram and must stay running.
+
+DigitalOcean Postgres connection strings include `sslmode=require`. The application translates that into the SSL setting used by asyncpg. `pg_dump` still receives the original libpq URL.
+
+1. Push `main` to GitHub.
+2. In DigitalOcean, open **Apps → Create App → GitHub** and select `hasanboyabdukamolov007-lab/Alcana-shashka-bot`, branch `main`.
+3. DigitalOcean can read `.do/app.yaml`. If the form is manual, choose the Dockerfile, HTTP port `8080`, and health check path `/`.
+4. Add a PostgreSQL 16 database in the same app. Bind its connection string to `DATABASE_URL`.
+5. Set `BOT_TOKEN` and `ADMIN_TELEGRAM_ID` as encrypted environment variables. Set `APP_ENV=production`, `LOG_LEVEL=INFO`, `BACKUP_STORAGE_PATH=/app/backups`, `BACKUP_RETENTION_DAYS=7`, and `BACKUP_HOUR_UTC=2`.
+6. Attach a 1 GB volume mounted at `/app/backups`.
+7. Deploy and wait until the log contains `health endpoint listening` and `recovered tournament=`.
+8. Open the app URL. It should return `{"status":"ok"}`. Then test `/admin` from the administrator account in Telegram.
+
+Use the Frankfurt (`fra`) region when it is offered. One instance is enough. Do not scale the bot to more than one container, or two processes will poll the same bot token.
+
 ## Railway
 
 1. Create a Railway project and add a PostgreSQL plugin.

@@ -6,7 +6,7 @@ import asyncio
 from logging.config import fileConfig
 
 from alembic import context
-from app.config import get_settings
+from app.config import asyncpg_engine_options, get_settings
 from app.db import models  # noqa: F401
 from app.db.base import Base
 from sqlalchemy.ext.asyncio import create_async_engine
@@ -32,7 +32,8 @@ def _do_run_migrations(connection) -> None:  # noqa: ANN001
 
 
 async def run_migrations_online() -> None:
-    engine = create_async_engine(get_settings().async_database_url, pool_pre_ping=True)
+    url, connect_args = asyncpg_engine_options(get_settings().database_url)
+    engine = create_async_engine(url, pool_pre_ping=True, connect_args=connect_args)
     async with engine.connect() as connection:
         await connection.run_sync(_do_run_migrations)
     await engine.dispose()

@@ -112,9 +112,9 @@ def _postgres_url(settings: Settings) -> str | None:
         or "+asyncpg" in url
         or "+psycopg" in url
     ):
-        from app.config import to_sync_database_url
+        from app.config import libpq_database_url
 
-        return to_sync_database_url(url)
+        return libpq_database_url(url)
     return None
 
 

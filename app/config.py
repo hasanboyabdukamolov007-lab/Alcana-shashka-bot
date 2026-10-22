@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -36,9 +37,48 @@ def normalize_database_url(url: str) -> str:
     return url
 
 
-def to_sync_database_url(url: str) -> str:
+def libpq_database_url(url: str) -> str:
+    """Return a URL that pg_dump accepts, including sslmode when present."""
+
+    if url.startswith("postgres://"):
+        url = "postgresql://" + url[len("postgres://") :]
+    for driver in ("postgresql+asyncpg://", "postgresql+psycopg://"):
+        if url.startswith(driver):
+            return "postgresql://" + url[len(driver) :]
+    return url
+
+
+_SSL_MODES = {"require", "verify-ca", "verify-full", "prefer"}
+
+
+def asyncpg_engine_options(url: str) -> tuple[str, dict[str, object]]:
+    """Convert a hosted Postgres URL into an asyncpg engine URL and connect args.
+
+    DigitalOcean and other managed databases append ``sslmode=require``.
+    asyncpg does not accept that query parameter, so it is translated to
+    ``connect_args={"ssl": True}``.
+    """
+
     normalized = normalize_database_url(url)
-    return normalized.replace("postgresql+asyncpg://", "postgresql+psycopg://", 1)
+    if not normalized.startswith("postgresql+asyncpg://"):
+        return normalized, {}
+    parts = urlsplit(normalized)
+    kept: list[tuple[str, str]] = []
+    sslmode = None
+    for key, value in parse_qsl(parts.query, keep_blank_values=True):
+        if key == "sslmode":
+            sslmode = value
+            continue
+        if key == "channel_binding":
+            continue
+        kept.append((key, value))
+    connect_args: dict[str, object] = {}
+    if sslmode in _SSL_MODES:
+        connect_args["ssl"] = True
+    cleaned = urlunsplit(
+        (parts.scheme, parts.netloc, parts.path, urlencode(kept), parts.fragment)
+    )
+    return cleaned, connect_args
 
 
 def validate_runtime_settings(settings: Settings) -> None:

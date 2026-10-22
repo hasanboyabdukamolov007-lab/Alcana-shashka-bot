@@ -6,7 +6,14 @@ import random
 from itertools import combinations
 
 import pytest
-from app.config import Settings, get_settings, normalize_database_url, validate_runtime_settings
+from app.config import (
+    Settings,
+    asyncpg_engine_options,
+    get_settings,
+    libpq_database_url,
+    normalize_database_url,
+    validate_runtime_settings,
+)
 from app.domain.enums import ResultKind, TournamentStatus
 from app.domain.exceptions import InvalidConfig, InvalidTransition
 from app.domain.numbers import assign_tournament_numbers
@@ -54,6 +61,11 @@ def test_configuration_loading(monkeypatch: pytest.MonkeyPatch) -> None:
     assert settings.admin_telegram_id == 77
     assert settings.async_database_url.startswith("postgresql+asyncpg://")
     assert normalize_database_url("postgresql://h/db").startswith("postgresql+asyncpg://")
+    hosted = "postgresql://u:p@db.ondigitalocean.com:25060/defaultdb?sslmode=require"
+    engine_url, connect_args = asyncpg_engine_options(hosted)
+    assert engine_url == "postgresql+asyncpg://u:p@db.ondigitalocean.com:25060/defaultdb"
+    assert connect_args == {"ssl": True}
+    assert "sslmode=require" in libpq_database_url(hosted)
     validate_runtime_settings(settings)
     get_settings.cache_clear()
 

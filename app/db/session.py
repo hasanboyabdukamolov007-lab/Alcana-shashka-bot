@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
-from app.config import Settings, normalize_database_url
+from app.config import Settings, asyncpg_engine_options
 
 
 def _enable_sqlite_foreign_keys(engine: AsyncEngine) -> None:
@@ -22,8 +22,12 @@ def _enable_sqlite_foreign_keys(engine: AsyncEngine) -> None:
 
 
 def make_engine(url: str) -> AsyncEngine:
-    normalized = normalize_database_url(url)
-    engine = create_async_engine(normalized, pool_pre_ping=True)
+    normalized, connect_args = asyncpg_engine_options(url)
+    engine = create_async_engine(
+        normalized,
+        pool_pre_ping=True,
+        connect_args=connect_args,
+    )
     if normalized.startswith("sqlite"):
         _enable_sqlite_foreign_keys(engine)
     return engine

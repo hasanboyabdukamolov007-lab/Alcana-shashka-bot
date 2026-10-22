@@ -1,0 +1,55 @@
+name: alcana-shashka-bot
+region: fra
+
+services:
+  - name: bot
+    github:
+      repo: hasanboyabdukamolov007-lab/Alcana-shashka-bot
+      branch: main
+      deploy_on_push: true
+    dockerfile_path: Dockerfile
+    http_port: 8080
+    health_check:
+      http_path: /
+      initial_delay_seconds: 20
+      period_seconds: 10
+      timeout_seconds: 5
+      success_threshold: 1
+      failure_threshold: 5
+    instance_count: 1
+    instance_size_slug: apps-s-1vcpu-1gb
+    envs:
+      - key: BOT_TOKEN
+        scope: RUN_TIME
+        type: SECRET
+      - key: ADMIN_TELEGRAM_ID
+        scope: RUN_TIME
+        type: SECRET
+      - key: DATABASE_URL
+        scope: RUN_TIME
+        value: ${db.DATABASE_URL}
+      - key: APP_ENV
+        scope: RUN_TIME
+        value: production
+      - key: LOG_LEVEL
+        scope: RUN_TIME
+        value: INFO
+      - key: BACKUP_STORAGE_PATH
+        scope: RUN_TIME
+        value: /app/backups
+      - key: BACKUP_RETENTION_DAYS
+        scope: RUN_TIME
+        value: "7"
+      - key: BACKUP_HOUR_UTC
+        scope: RUN_TIME
+        value: "2"
+    volumes:
+      - name: backups
+        mount_path: /app/backups
+        size_gigabytes: 1
+
+databases:
+  - name: db
+    engine: PG
+    version: "16"
+    production: true
