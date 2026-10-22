@@ -138,6 +138,47 @@ def opponent_private_text(
     )
 
 
+_PLACE_MEDALS = {1: "🥇", 2: "🥈", 3: "🥉"}
+
+
+def final_results_announcement(
+    *,
+    tournament_name: str,
+    winners: list[tuple[int, str]],
+    missing_note: str = "",
+) -> str:
+    by_place = {place: name for place, name in winners}
+    lines = [
+        f"🏆 “{tournament_name}” o‘z yakuniga yetdi!",
+        "",
+        "Turnir g‘oliblari:",
+        "",
+    ]
+    for place in (1, 2, 3):
+        name = by_place.get(place)
+        if name is None:
+            continue
+        medal = _PLACE_MEDALS[place]
+        lines.append(f"{medal} {place}-o‘rin: {name}")
+    if not any(place in by_place for place in (1, 2, 3)):
+        lines.append("G‘oliblar aniqlanmadi.")
+    if missing_note:
+        lines.extend(["", missing_note])
+    lines.extend(
+        [
+            "",
+            "G‘oliblarni munosib natijalari bilan samimiy tabriklaymiz!",
+            "",
+            "👏 Musobaqada faol ishtirok etgan barcha xodimlarga minnatdorchilik bildiramiz. "
+            "Sizlarning mahoratingiz, faolligingiz va sog‘lom raqobatingiz "
+            "turnirga o‘zgacha ruh bag‘ishladi.",
+            "",
+            "♟ Keyingi turnirlarda barchangizga yangi g‘alabalar tilaymiz!",
+        ]
+    )
+    return "\n".join(lines)
+
+
 def prize_congratulations(
     *,
     player_name: str,

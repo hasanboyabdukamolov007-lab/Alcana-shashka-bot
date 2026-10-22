@@ -27,7 +27,13 @@ from app.domain.enums import (
 )
 from app.domain.prizes import prize_slot_count
 from app.domain.scoring import calculate_standings
-from app.presentation.messages import money, registration_text, status_label, unawarded_note
+from app.presentation.messages import (
+    final_results_announcement,
+    money,
+    registration_text,
+    status_label,
+    unawarded_note,
+)
 from app.services.support import (
     get_settings_row,
     list_participants,
@@ -288,15 +294,12 @@ async def final_public_text(session: AsyncSession, tournament: Tournament) -> st
         if item.final_place is not None and item.status == ParticipantStatus.ACTIVE.value
     ]
     eligible.sort(key=lambda item: (item.final_place or 999, item.id))
-    lines = [f"{tournament.name}", "Yakuniy natijalar"]
     prizes = {1: row.prize_first, 2: row.prize_second, 3: row.prize_third}
-    for item in eligible:
-        prize = prizes.get(item.final_place or 0)
-        prize_text = f", mukofot {money(prize)}" if prize is not None else ""
-        lines.append(
-            f"{item.final_place}-o‘rin. {item.tournament_number}-raqam {item.display_name} — "
-            f"{item.score} ball{prize_text}"
-        )
+    winners = [
+        (item.final_place, item.display_name)
+        for item in eligible
+        if item.final_place in prizes
+    ]
     note = unawarded_note(
         sum(
             1
@@ -304,8 +307,22 @@ async def final_public_text(session: AsyncSession, tournament: Tournament) -> st
             if item.status == ParticipantStatus.ACTIVE.value and not item.prize_excluded
         )
     )
-    if note:
-        lines.append(note)
+    lines = [
+        final_results_announcement(
+            tournament_name=tournament.name,
+            winners=winners,
+            missing_note=note,
+        ),
+        "",
+        "To‘liq natijalar:",
+    ]
+    for item in eligible:
+        prize = prizes.get(item.final_place or 0)
+        prize_text = f", mukofot {money(prize)}" if prize is not None else ""
+        lines.append(
+            f"{item.final_place}-o‘rin. {item.tournament_number}-raqam {item.display_name} — "
+            f"{item.score} ball{prize_text}"
+        )
     withdrawn = [item for item in participants if item.status == ParticipantStatus.WITHDRAWN.value]
     if withdrawn:
         lines.append("")
