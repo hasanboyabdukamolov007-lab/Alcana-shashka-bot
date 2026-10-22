@@ -227,14 +227,27 @@ async def test_admin_authorization_and_single_live_tournament(session, settings)
             settings=settings,
             name="Ikkinchi",
         )
+    member_group = await connect_group(
+        session,
+        actor_telegram_id=settings.admin_telegram_id,
+        settings=settings,
+        telegram_group_id=-55,
+        title="Oddiy",
+        membership=BotMembership(status="member", can_pin_messages=False),
+    )
+    assert member_group.can_pin is False
     with pytest.raises(GroupPermissionError):
         await connect_group(
             session,
             actor_telegram_id=settings.admin_telegram_id,
             settings=settings,
-            telegram_group_id=-55,
+            telegram_group_id=-56,
             title="Yopiq",
-            membership=BotMembership(status="member", can_pin_messages=False),
+            membership=BotMembership(
+                status="left",
+                can_pin_messages=False,
+                can_send_messages=False,
+            ),
         )
 
 

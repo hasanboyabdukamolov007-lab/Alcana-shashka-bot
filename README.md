@@ -70,7 +70,7 @@ The Compose file reads `.env` and overrides `DATABASE_URL` so the bot reaches th
 
 ## Administrator workflow
 
-1. Add the bot to a group as an administrator with permission to pin messages. Other moderation rights are not required.
+1. Add the bot to a group. Administrator rights are optional. If the bot can pin messages, the registration post is pinned.
 2. Send `/connect` in that group.
 3. Open a private chat, send `/admin`, and create a tournament.
 4. Choose the group, limits, and prizes. Review the summary.

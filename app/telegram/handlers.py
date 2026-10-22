@@ -907,6 +907,7 @@ async def connect(message: Message, session, settings: Settings, bot) -> None:
     membership = BotMembership(
         status=member.status,
         can_pin_messages=bool(getattr(member, "can_pin_messages", False)),
+        can_send_messages=bool(getattr(member, "can_send_messages", True)),
     )
     try:
         await connect_group(
@@ -920,7 +921,13 @@ async def connect(message: Message, session, settings: Settings, bot) -> None:
     except AppError as exc:
         await message.answer(str(exc))
         return
-    await message.answer(f"Guruh ulandi: {message.chat.title}")
+    if membership.can_pin_messages or membership.status == "creator":
+        await message.answer(f"Guruh ulandi: {message.chat.title}")
+    else:
+        await message.answer(
+            f"Guruh ulandi: {message.chat.title}\n"
+            "Bot administrator emas. Xabarlar yuboriladi, lekin mahkamlanmaydi."
+        )
 
 
 @group_router.my_chat_member()

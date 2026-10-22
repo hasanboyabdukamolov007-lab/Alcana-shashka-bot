@@ -18,12 +18,13 @@ from app.services.support import audit, ensure_database, get_live_tournament, re
 class BotMembership:
     status: str
     can_pin_messages: bool
+    can_send_messages: bool = True
 
 
 def membership_is_sufficient(membership: BotMembership) -> bool:
-    if membership.status == "creator":
-        return True
-    return membership.status == "administrator" and membership.can_pin_messages
+    if not membership.can_send_messages:
+        return False
+    return membership.status in {"creator", "administrator", "member", "restricted"}
 
 
 async def connect_group(
@@ -39,10 +40,10 @@ async def connect_group(
     require_admin(actor_telegram_id, settings)
     if not membership_is_sufficient(membership):
         raise GroupPermissionError(
-            "Bot guruhda administrator bo‘lishi va xabarlarni mahkamlash "
-            "huquqiga ega bo‘lishi kerak. Boshqa moderatsiya huquqlari shart emas."
+            "Bot guruhda bo‘lishi va xabar yubora olishi kerak. Administrator bo‘lishi shart emas."
         )
     cleaned = title.strip() or "Guruh"
+    can_pin = membership.status == "creator" or membership.can_pin_messages
     existing = (
         await session.execute(
             select(ConnectedGroup).where(ConnectedGroup.telegram_group_id == telegram_group_id)
@@ -55,7 +56,7 @@ async def connect_group(
             title=cleaned[:255],
             connected_by=actor_telegram_id,
             is_active=True,
-            can_pin=True,
+            can_pin=can_pin,
             created_at=now,
             updated_at=now,
         )
@@ -63,7 +64,7 @@ async def connect_group(
     else:
         existing.title = cleaned[:255]
         existing.is_active = True
-        existing.can_pin = True
+        existing.can_pin = can_pin
         existing.updated_at = now
     await session.flush()
     await audit(

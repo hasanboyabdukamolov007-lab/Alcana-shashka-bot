@@ -202,9 +202,12 @@ class GroupPublisher:
             row.telegram_message_id = message_id
             row.chat_id = group.telegram_group_id
             row.updated_at = datetime.now(UTC)
-        if pin:
-            await self.sender.pin_message(group.telegram_group_id, message_id)
-            row.is_pinned = True
+        if pin and group.can_pin:
+            try:
+                await self.sender.pin_message(group.telegram_group_id, message_id)
+                row.is_pinned = True
+            except Exception:
+                row.is_pinned = False
         await session.commit()
         await session.refresh(row)
         return row
