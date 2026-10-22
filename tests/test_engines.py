@@ -32,10 +32,27 @@ from app.domain.prizes import (
 from app.domain.scoring import SwissGame, calculate_standings, virtual_opponent_score
 from app.domain.state_machine import assert_transition
 from app.domain.validation import max_swiss_rounds, validate_limits
-from app.presentation.messages import PARTICIPANT_MENU, money, prize_congratulations
+from app.presentation.messages import (
+    PARTICIPANT_MENU,
+    money,
+    prize_congratulations,
+    registration_text,
+)
 
 
 def test_uzbek_menu_and_prize_text() -> None:
+    notice = registration_text(
+        name="Bahor kubogi",
+        status_label="OCHIQ",
+        names=["Ali Valiyev"],
+        registered=1,
+        maximum=16,
+        prizes=(200_000, 100_000, 50_000),
+        waiting=0,
+    )
+    assert notice.startswith("🎉 Assalomu alaykum, hurmatli “Alcana Print” jamoasi!")
+    assert "Oylik shashka musobaqamizga rasman start berildi!" in notice
+    assert "Bahor kubogi" in notice
     assert PARTICIPANT_MENU[2] == "Mening o‘yinlarim"
     assert "200 000 so‘m" in money(200_000)
     text = prize_congratulations(

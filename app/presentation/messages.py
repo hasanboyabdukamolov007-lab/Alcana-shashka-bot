@@ -51,6 +51,21 @@ def split_text(text: str, limit: int = TELEGRAM_TEXT_LIMIT) -> list[str]:
     return parts
 
 
+def registration_intro(*, registration_open: bool) -> str:
+    if registration_open:
+        action = "📋 Ro‘yxatdan o‘tish uchun pastdagi tugmani bosing."
+    else:
+        action = "📋 Ro‘yxatdan o‘tish hozircha yopiq."
+    return (
+        "🎉 Assalomu alaykum, hurmatli “Alcana Print” jamoasi!\n\n"
+        "♟ Oylik shashka musobaqamizga rasman start berildi!\n\n"
+        "Barcha ishtirokchilarga munosib raqobat, aniq yurishlar va yorqin g‘alabalar tilaymiz.\n\n"
+        f"{action}\n\n"
+        "Har bir bahsda mahoratingizni namoyon eting va chempionlik sari dadil harakat qiling!\n\n"
+        "🏆 Barcha ishtirokchilarga omad yor bo‘lsin!"
+    )
+
+
 def registration_text(
     *,
     name: str,
@@ -65,7 +80,9 @@ def registration_text(
     listed = "\n".join(f"{index}. {item}" for index, item in enumerate(names, start=1))
     if not listed:
         listed = "Hali ishtirokchi yo‘q."
+    intro = registration_intro(registration_open=status_label == "OCHIQ")
     body = (
+        f"{intro}\n\n"
         f"🏆 {name}\n\n"
         f"Ro‘yxatdan o‘tish: {status_label}\n\n"
         f"Ishtirokchilar ({registered}/{maximum}):\n{listed}\n\n"
@@ -85,6 +102,7 @@ def registration_text(
     extra = max(len(names) - 30, 0)
     tail = f"\n… va yana {extra} nafar." if extra else ""
     return (
+        f"{intro}\n\n"
         f"🏆 {name}\n\n"
         f"Ro‘yxatdan o‘tish: {status_label}\n\n"
         f"Ishtirokchilar ({registered}/{maximum}):\n{short_names}{tail}\n\n"
