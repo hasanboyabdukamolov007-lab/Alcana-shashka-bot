@@ -18,9 +18,13 @@ class AiogramSender:
     def __init__(self, bot: Bot) -> None:
         self.bot = bot
 
-    async def send_message(self, chat_id: int, text: str, reply_markup=None) -> int:
+    async def send_message(
+        self, chat_id: int, text: str, reply_markup=None, parse_mode: str | None = None
+    ) -> int:
         try:
-            message = await self.bot.send_message(chat_id, text, reply_markup=reply_markup)
+            message = await self.bot.send_message(
+                chat_id, text, reply_markup=reply_markup, parse_mode=parse_mode
+            )
         except TelegramRetryAfter as exc:
             raise DeliveryError(
                 DeliveryResult.RATE_LIMITED, retry_after=int(exc.retry_after)
@@ -34,7 +38,12 @@ class AiogramSender:
         return message.message_id
 
     async def edit_message(
-        self, chat_id: int, message_id: int, text: str, reply_markup=None
+        self,
+        chat_id: int,
+        message_id: int,
+        text: str,
+        reply_markup=None,
+        parse_mode: str | None = None,
     ) -> None:
         try:
             await self.bot.edit_message_text(
@@ -42,6 +51,7 @@ class AiogramSender:
                 chat_id=chat_id,
                 message_id=message_id,
                 reply_markup=reply_markup,
+                parse_mode=parse_mode,
             )
         except TelegramBadRequest as exc:
             lowered = str(exc).lower()

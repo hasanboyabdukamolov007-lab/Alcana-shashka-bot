@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import html
+
 from app.domain.enums import PRIZE_SLOTS
 
 MENU_PROFILE = "Mening profilim"
@@ -141,25 +143,38 @@ def opponent_private_text(
 _PLACE_MEDALS = {1: "🥇", 2: "🥈", 3: "🥉"}
 
 
+def mention(name: str, telegram_id: int | None) -> str:
+    """Tag a participant in a group message. Without an id, return the plain name."""
+
+    safe = html.escape(name, quote=False)
+    if telegram_id is None:
+        return safe
+    return f'<a href="tg://user?id={telegram_id}">{safe}</a>'
+
+
 def final_results_announcement(
     *,
     tournament_name: str,
-    winners: list[tuple[int, str]],
+    winners: list[tuple[int, str, int | None]],
     missing_note: str = "",
 ) -> str:
-    by_place = {place: name for place, name in winners}
+    by_place = {place: (name, telegram_id) for place, name, telegram_id in winners}
+    html_mode = any(telegram_id is not None for _, telegram_id in by_place.values())
+    shown_name = html.escape(tournament_name, quote=False) if html_mode else tournament_name
     lines = [
-        f"🏆 “{tournament_name}” o‘z yakuniga yetdi!",
+        f"🏆 “{shown_name}” o‘z yakuniga yetdi!",
         "",
         "Turnir g‘oliblari:",
         "",
     ]
     for place in (1, 2, 3):
-        name = by_place.get(place)
-        if name is None:
+        winner = by_place.get(place)
+        if winner is None:
             continue
+        name, telegram_id = winner
+        shown = mention(name, telegram_id) if html_mode else name
         medal = _PLACE_MEDALS[place]
-        lines.append(f"{medal} {place}-o‘rin: {name}")
+        lines.append(f"{medal} {place}-o‘rin: {shown}")
     if not any(place in by_place for place in (1, 2, 3)):
         lines.append("G‘oliblar aniqlanmadi.")
     if missing_note:

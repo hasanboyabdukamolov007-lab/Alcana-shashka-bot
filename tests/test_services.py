@@ -136,14 +136,21 @@ class _GroupSender:
         self.pinned: list[tuple[int, int]] = []
         self.unpinned: list[tuple[int, int]] = []
 
-    async def send_message(self, chat_id: int, text: str, reply_markup=None) -> int:
+    async def send_message(
+        self, chat_id: int, text: str, reply_markup=None, parse_mode: str | None = None
+    ) -> int:
         message_id = self.next_id
         self.next_id += 1
         self.messages[(chat_id, message_id)] = text
         return message_id
 
     async def edit_message(
-        self, chat_id: int, message_id: int, text: str, reply_markup=None
+        self,
+        chat_id: int,
+        message_id: int,
+        text: str,
+        reply_markup=None,
+        parse_mode: str | None = None,
     ) -> None:
         if message_id in self.deleted or (chat_id, message_id) not in self.messages:
             raise MessageNotFoundError()

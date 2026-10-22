@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import html
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -29,6 +31,7 @@ from app.domain.prizes import prize_slot_count
 from app.domain.scoring import calculate_standings
 from app.presentation.messages import (
     final_results_announcement,
+    mention,
     money,
     registration_text,
     status_label,
@@ -64,6 +67,29 @@ async def _user_participant(
 
 def _participant_map(participants: list[TournamentParticipant]) -> dict[int, TournamentParticipant]:
     return {item.id: item for item in participants}
+
+
+async def _telegram_ids(
+    session: AsyncSession, participants: list[TournamentParticipant]
+) -> dict[int, int]:
+    user_ids = {item.user_id for item in participants}
+    if not user_ids:
+        return {}
+    rows = (
+        await session.execute(
+            select(User.id, User.telegram_id).where(User.id.in_(user_ids))
+        )
+    ).all()
+    return {user_id: telegram_id for user_id, telegram_id in rows}
+
+
+def _tagged(person: TournamentParticipant, telegram_ids: dict[int, int], *, html_mode: bool) -> str:
+    number = person.tournament_number if person.tournament_number is not None else "—"
+    if html_mode:
+        name = mention(person.display_name, telegram_ids.get(person.user_id))
+    else:
+        name = person.display_name
+    return f"{number}-raqam {name}"
 
 
 async def registration_message(session: AsyncSession, tournament: Tournament) -> str:
@@ -168,13 +194,17 @@ async def round_public_text(
     ).scalar_one_or_none()
     if swiss_round is None:
         return "Raund topilmadi."
-    participants = _participant_map(await list_participants(session, tournament.id))
+    roster = await list_participants(session, tournament.id)
+    participants = _participant_map(roster)
+    telegram_ids = await _telegram_ids(session, roster)
+    html_mode = bool(telegram_ids)
+    title = html.escape(tournament.name, quote=False) if html_mode else tournament.name
     matches = (
         (await session.execute(select(Match).where(Match.round_id == swiss_round.id)))
         .scalars()
         .all()
     )
-    lines = [f"{tournament.name}", f"{round_number}-raund juftliklari"]
+    lines = [title, f"{round_number}-raund juftliklari"]
     for index, match in enumerate(matches, start=1):
         left = participants[match.player1_id]
         right = participants[match.player2_id]
@@ -188,15 +218,15 @@ async def round_public_text(
         ).scalar_one_or_none()
         score = _result_label(result.outcome) if result is not None else "kutilmoqda"
         lines.append(
-            f"{index}. {left.tournament_number}-raqam {left.display_name} — "
-            f"{right.tournament_number}-raqam {right.display_name}: {score}"
+            f"{index}. {_tagged(left, telegram_ids, html_mode=html_mode)} — "
+            f"{_tagged(right, telegram_ids, html_mode=html_mode)}: {score}"
         )
     bye = (
         await session.execute(select(ByeAssignment).where(ByeAssignment.round_id == swiss_round.id))
     ).scalar_one_or_none()
     if bye is not None:
         person = participants[bye.participant_id]
-        lines.append(f"BYE: {person.tournament_number}-raqam {person.display_name} (2 ball)")
+        lines.append(f"BYE: {_tagged(person, telegram_ids, html_mode=html_mode)} (2 ball)")
     return "\n".join(lines)
 
 
@@ -263,11 +293,21 @@ async def tiebreak_public_text(session: AsyncSession, tournament: Tournament) ->
         .scalars()
         .first()
     )
-    lines = [f"{tournament.name}", "Mukofot pley-offi", "Shveytsariya ballari o‘zgarmaydi."]
     if stage is None:
-        lines.append("Pley-off yo‘q.")
-        return "\n".join(lines)
-    participants = _participant_map(await list_participants(session, tournament.id))
+        return "\n".join(
+            [
+                tournament.name,
+                "Mukofot pley-offi",
+                "Shveytsariya ballari o‘zgarmaydi.",
+                "Pley-off yo‘q.",
+            ]
+        )
+    roster = await list_participants(session, tournament.id)
+    telegram_ids = await _telegram_ids(session, roster)
+    html_mode = bool(telegram_ids)
+    title = html.escape(tournament.name, quote=False) if html_mode else tournament.name
+    lines = [title, "Mukofot pley-offi", "Shveytsariya ballari o‘zgarmaydi."]
+    participants = _participant_map(roster)
     matches = (
         (await session.execute(select(TiebreakMatch).where(TiebreakMatch.stage_id == stage.id)))
         .scalars()
@@ -279,8 +319,8 @@ async def tiebreak_public_text(session: AsyncSession, tournament: Tournament) ->
         right = participants[match.player2_id]
         label = _result_label(match.outcome) if match.outcome else "kutilmoqda"
         lines.append(
-            f"{left.tournament_number}-raqam {left.display_name} — "
-            f"{right.tournament_number}-raqam {right.display_name}: {label}"
+            f"{_tagged(left, telegram_ids, html_mode=html_mode)} — "
+            f"{_tagged(right, telegram_ids, html_mode=html_mode)}: {label}"
         )
     return "\n".join(lines)
 
@@ -295,10 +335,11 @@ async def final_public_text(session: AsyncSession, tournament: Tournament) -> st
     ]
     eligible.sort(key=lambda item: (item.final_place or 999, item.id))
     prizes = {1: row.prize_first, 2: row.prize_second, 3: row.prize_third}
+    telegram_ids = await _telegram_ids(session, participants)
     winners = [
-        (item.final_place, item.display_name)
+        (item.final_place, item.display_name, telegram_ids.get(item.user_id))
         for item in eligible
-        if item.final_place in prizes
+        if item.final_place in prizes and item.final_place is not None
     ]
     note = unawarded_note(
         sum(

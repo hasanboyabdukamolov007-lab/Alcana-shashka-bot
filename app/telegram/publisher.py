@@ -22,6 +22,12 @@ from app.services.views import (
 )
 
 
+def _parse_mode(text: str) -> str | None:
+    if "tg://user?id=" in text:
+        return "HTML"
+    return None
+
+
 class GroupPublisher:
     def __init__(self, sender, bot_username: str) -> None:
         self.sender = sender
@@ -180,13 +186,19 @@ class GroupPublisher:
                     row.telegram_message_id,
                     text,
                     reply_markup,
+                    parse_mode=_parse_mode(text),
                 )
                 row.updated_at = datetime.now(UTC)
                 await session.commit()
                 return row
             except MessageNotFoundError:
                 row.telegram_message_id = None
-        message_id = await self.sender.send_message(group.telegram_group_id, text, reply_markup)
+        message_id = await self.sender.send_message(
+            group.telegram_group_id,
+            text,
+            reply_markup,
+            parse_mode=_parse_mode(text),
+        )
         if row is None:
             row = TelegramMessage(
                 tournament_id=tournament.id,
