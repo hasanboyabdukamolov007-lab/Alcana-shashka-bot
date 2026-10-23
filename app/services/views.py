@@ -30,6 +30,7 @@ from app.domain.enums import (
 from app.domain.prizes import prize_slot_count
 from app.domain.scoring import calculate_standings
 from app.presentation.messages import (
+    bold,
     final_results_announcement,
     mention,
     money,
@@ -83,13 +84,10 @@ async def _telegram_ids(
     return {user_id: telegram_id for user_id, telegram_id in rows}
 
 
-def _tagged(person: TournamentParticipant, telegram_ids: dict[int, int], *, html_mode: bool) -> str:
+def _tagged(person: TournamentParticipant, telegram_ids: dict[int, int]) -> str:
     number = person.tournament_number if person.tournament_number is not None else "—"
-    if html_mode:
-        name = mention(person.display_name, telegram_ids.get(person.user_id))
-    else:
-        name = person.display_name
-    return f"{number}-raqam {name}"
+    name = mention(person.display_name, telegram_ids.get(person.user_id))
+    return f"{bold(f'{number}-raqam')} {name}"
 
 
 async def registration_message(session: AsyncSession, tournament: Tournament) -> str:
@@ -197,14 +195,16 @@ async def round_public_text(
     roster = await list_participants(session, tournament.id)
     participants = _participant_map(roster)
     telegram_ids = await _telegram_ids(session, roster)
-    html_mode = bool(telegram_ids)
-    title = html.escape(tournament.name, quote=False) if html_mode else tournament.name
     matches = (
         (await session.execute(select(Match).where(Match.round_id == swiss_round.id)))
         .scalars()
         .all()
     )
-    lines = [title, f"{round_number}-raund juftliklari"]
+    lines = [
+        bold(tournament.name),
+        bold(f"♟ {round_number}-raund juftliklari"),
+        "",
+    ]
     for index, match in enumerate(matches, start=1):
         left = participants[match.player1_id]
         right = participants[match.player2_id]
@@ -217,17 +217,30 @@ async def round_public_text(
             )
         ).scalar_one_or_none()
         score = _result_label(result.outcome) if result is not None else "kutilmoqda"
-        lines.append(
-            f"{index}. {_tagged(left, telegram_ids, html_mode=html_mode)} — "
-            f"{_tagged(right, telegram_ids, html_mode=html_mode)}: {score}"
+        lines.extend(
+            [
+                bold(f"{index}-o‘yin"),
+                _tagged(left, telegram_ids),
+                _tagged(right, telegram_ids),
+                f"Natija: {bold(score)}",
+                "",
+            ]
         )
     bye = (
         await session.execute(select(ByeAssignment).where(ByeAssignment.round_id == swiss_round.id))
     ).scalar_one_or_none()
     if bye is not None:
         person = participants[bye.participant_id]
-        lines.append(f"BYE: {_tagged(person, telegram_ids, html_mode=html_mode)} (2 ball)")
-    return "\n".join(lines)
+        lines.extend(
+            [
+                bold("BYE"),
+                _tagged(person, telegram_ids),
+                bold("2 ball"),
+                "Haqiqiy g‘alaba emas.",
+                "",
+            ]
+        )
+    return "\n".join(lines).strip()
 
 
 def _result_label(outcome: str) -> str:
@@ -259,26 +272,35 @@ async def standings_text(session: AsyncSession, tournament: Tournament) -> str:
         horizon=horizon,
     )
     by_id = _participant_map(participants)
-    title = "Jonli reyting"
-    if tournament.status == TournamentStatus.ROUND_ACTIVE.value:
-        title += " (vaqtinchalik)"
-    lines = [tournament.name, title]
+    provisional = tournament.status == TournamentStatus.ROUND_ACTIVE.value
+    lines = [bold(tournament.name), bold("📊 Jonli reyting")]
+    if provisional:
+        lines.append("Vaqtinchalik. Raund tugagach yangilanadi.")
+    lines.append("Teng balldagi ishtirokchilarning o‘rni bir xil.")
+    lines.append("")
     if not rows:
         lines.append("Hali reyting yo‘q.")
     for row in rows:
         person = by_id[row.participant_id]
-        lines.append(
-            f"{row.rank}. {person.tournament_number}-raqam {person.display_name} — "
-            f"{row.points} ball, BH {row.buchholz}, SB {row.sonneborn_berger:g}, "
-            f"g‘alaba {row.real_wins}"
+        number = person.tournament_number if person.tournament_number is not None else "—"
+        lines.extend(
+            [
+                f"{bold(f'{row.rank}-o‘rin')} · {bold(f'{number}-raqam')}",
+                html.escape(person.display_name, quote=False),
+                f"Ball: {bold(str(row.points))} · BH {row.buchholz} · "
+                f"SB {row.sonneborn_berger:g} · G‘alaba {bold(str(row.real_wins))}",
+                "",
+            ]
         )
     withdrawn = [item for item in participants if item.status == ParticipantStatus.WITHDRAWN.value]
     if withdrawn:
-        lines.append("")
-        lines.append("Chiqarilgan ishtirokchilar (mukofot yo‘q):")
+        lines.append(bold("Chiqarilgan ishtirokchilar"))
+        lines.append("Mukofot yo‘q.")
         for item in withdrawn:
-            lines.append(f"- {item.display_name}: {item.score} ball")
-    return "\n".join(lines)
+            name = html.escape(item.display_name, quote=False)
+            lines.append(f"{name} · {bold(str(item.score))} ball")
+            lines.append("")
+    return "\n".join(lines).strip()
 
 
 async def tiebreak_public_text(session: AsyncSession, tournament: Tournament) -> str:
@@ -304,25 +326,34 @@ async def tiebreak_public_text(session: AsyncSession, tournament: Tournament) ->
         )
     roster = await list_participants(session, tournament.id)
     telegram_ids = await _telegram_ids(session, roster)
-    html_mode = bool(telegram_ids)
-    title = html.escape(tournament.name, quote=False) if html_mode else tournament.name
-    lines = [title, "Mukofot pley-offi", "Shveytsariya ballari o‘zgarmaydi."]
+    lines = [
+        bold(tournament.name),
+        bold("🏆 Mukofot pley-offi"),
+        "Shveytsariya ballari o‘zgarmaydi.",
+        "",
+    ]
     participants = _participant_map(roster)
     matches = (
         (await session.execute(select(TiebreakMatch).where(TiebreakMatch.stage_id == stage.id)))
         .scalars()
         .all()
     )
-    lines.append(f"{stage.stage_index}-bosqich. Holat: {stage.status}")
-    for match in matches:
+    lines.append(bold(f"{stage.stage_index}-bosqich · {stage.status}"))
+    lines.append("")
+    for index, match in enumerate(matches, start=1):
         left = participants[match.player1_id]
         right = participants[match.player2_id]
         label = _result_label(match.outcome) if match.outcome else "kutilmoqda"
-        lines.append(
-            f"{_tagged(left, telegram_ids, html_mode=html_mode)} — "
-            f"{_tagged(right, telegram_ids, html_mode=html_mode)}: {label}"
+        lines.extend(
+            [
+                bold(f"{index}-o‘yin"),
+                _tagged(left, telegram_ids),
+                _tagged(right, telegram_ids),
+                f"Natija: {bold(label)}",
+                "",
+            ]
         )
-    return "\n".join(lines)
+    return "\n".join(lines).strip()
 
 
 async def final_public_text(session: AsyncSession, tournament: Tournament) -> str:
@@ -355,21 +386,28 @@ async def final_public_text(session: AsyncSession, tournament: Tournament) -> st
             missing_note=note,
         ),
         "",
-        "To‘liq natijalar:",
+        bold("To‘liq natijalar"),
+        "",
     ]
     for item in eligible:
         prize = prizes.get(item.final_place or 0)
-        prize_text = f", mukofot {money(prize)}" if prize is not None else ""
-        lines.append(
-            f"{item.final_place}-o‘rin. {item.tournament_number}-raqam {item.display_name} — "
-            f"{item.score} ball{prize_text}"
+        prize_text = f" · Mukofot {bold(money(prize))}" if prize is not None else ""
+        number = item.tournament_number if item.tournament_number is not None else "—"
+        lines.extend(
+            [
+                f"{bold(f'{item.final_place}-o‘rin')} · {bold(f'{number}-raqam')}",
+                html.escape(item.display_name, quote=False),
+                f"Ball: {bold(str(item.score))}{prize_text}",
+                "",
+            ]
         )
     withdrawn = [item for item in participants if item.status == ParticipantStatus.WITHDRAWN.value]
     if withdrawn:
         lines.append("")
         lines.append("Chiqarilgan ishtirokchilar:")
         for item in withdrawn:
-            lines.append(f"- {item.display_name}: {item.score} ball. Mukofot yo‘q.")
+            name = html.escape(item.display_name, quote=False)
+            lines.append(f"- {name}: {item.score} ball. Mukofot yo‘q.")
     if tournament.status == TournamentStatus.CANCELLED.value:
         lines = [f"{tournament.name}", "Turnir bekor qilindi. Chempion e’lon qilinmaydi."]
     return "\n".join(lines)

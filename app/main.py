@@ -13,7 +13,9 @@ from app.db.session import engine_from_settings, make_sessionmaker
 from app.jobs import backup_loop, outbox_loop
 from app.logging_setup import setup_logging
 from app.services.recovery import recover_after_restart
+from app.services.support import get_live_tournament
 from app.telegram.bot import build_dispatcher
+from app.telegram.publisher import GroupPublisher
 from app.telegram.sender import AiogramSender
 
 logger = logging.getLogger(__name__)
@@ -61,6 +63,18 @@ async def run() -> None:
         health = await _health_server(int(port))
         logger.info("health endpoint listening on %s", port)
     sender = AiogramSender(bot)
+    me = await bot.get_me()
+    publisher = GroupPublisher(sender, me.username or "")
+    async with sessionmaker() as session:
+        live = await get_live_tournament(session)
+        if live is not None:
+            try:
+                await publisher.sync(session, live)
+                logger.info("group messages refreshed tournament=%s", live.id)
+            except Exception:
+                logger.exception(
+                    "group messages were not refreshed tournament=%s", live.id
+                )
     tasks = [
         asyncio.create_task(outbox_loop(sessionmaker, sender)),
         asyncio.create_task(backup_loop(sessionmaker, settings)),

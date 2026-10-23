@@ -23,7 +23,7 @@ from app.services.views import (
 
 
 def _parse_mode(text: str) -> str | None:
-    if "tg://user?id=" in text:
+    if "<b>" in text or "tg://user?id=" in text:
         return "HTML"
     return None
 

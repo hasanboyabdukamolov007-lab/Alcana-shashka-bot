@@ -79,22 +79,27 @@ def registration_text(
     waiting: int,
 ) -> str:
     remaining = max(maximum - registered, 0)
-    listed = "\n".join(f"{index}. {item}" for index, item in enumerate(names, start=1))
+    listed = "\n".join(
+        f"{bold(f'{index}.')} {html.escape(item, quote=False)}"
+        for index, item in enumerate(names, start=1)
+    )
     if not listed:
         listed = "Hali ishtirokchi yo‘q."
     intro = registration_intro(registration_open=status_label == "OCHIQ")
+    roster_title = bold(f"Ishtirokchilar ({registered}/{maximum})")
+    free_line = bold("Ishtirok bepul.")
     body = (
         f"{intro}\n\n"
-        f"🏆 {name}\n\n"
-        f"Ro‘yxatdan o‘tish: {status_label}\n\n"
-        f"Ishtirokchilar ({registered}/{maximum}):\n{listed}\n\n"
-        f"Bo‘sh joylar: {remaining}\n"
-        f"Kutish ro‘yxati: {waiting}\n\n"
-        "Mukofotlar:\n"
-        f"1-o‘rin: {money(prizes[0])}\n"
-        f"2-o‘rin: {money(prizes[1])}\n"
-        f"3-o‘rin: {money(prizes[2])}\n\n"
-        "Ishtirok bepul."
+        f"🏆 {bold(name)}\n\n"
+        f"Ro‘yxatdan o‘tish: {bold(status_label)}\n\n"
+        f"{roster_title}\n{listed}\n\n"
+        f"Bo‘sh joylar: {bold(str(remaining))}\n"
+        f"Kutish ro‘yxati: {bold(str(waiting))}\n\n"
+        f"{bold('Mukofotlar')}\n"
+        f"1-o‘rin: {bold(money(prizes[0]))}\n"
+        f"2-o‘rin: {bold(money(prizes[1]))}\n"
+        f"3-o‘rin: {bold(money(prizes[2]))}\n\n"
+        f"{free_line}"
     )
     if len(body) <= TELEGRAM_TEXT_LIMIT:
         return body
@@ -105,12 +110,14 @@ def registration_text(
     tail = f"\n… va yana {extra} nafar." if extra else ""
     return (
         f"{intro}\n\n"
-        f"🏆 {name}\n\n"
-        f"Ro‘yxatdan o‘tish: {status_label}\n\n"
-        f"Ishtirokchilar ({registered}/{maximum}):\n{short_names}{tail}\n\n"
-        f"Bo‘sh joylar: {remaining}\n"
-        f"Mukofotlar: {money(prizes[0])}, {money(prizes[1])}, {money(prizes[2])}\n"
-        "Ishtirok bepul."
+        f"🏆 {bold(name)}\n\n"
+        f"Ro‘yxatdan o‘tish: {bold(status_label)}\n\n"
+        f"{roster_title}\n"
+        f"{html.escape(short_names, quote=False)}{html.escape(tail, quote=False)}\n\n"
+        f"Bo‘sh joylar: {bold(str(remaining))}\n"
+        f"Mukofotlar: {bold(money(prizes[0]))}, {bold(money(prizes[1]))}, "
+        f"{bold(money(prizes[2]))}\n"
+        f"{free_line}"
     )
 
 
@@ -143,6 +150,10 @@ def opponent_private_text(
 _PLACE_MEDALS = {1: "🥇", 2: "🥈", 3: "🥉"}
 
 
+def bold(text: str) -> str:
+    return f"<b>{html.escape(text, quote=False)}</b>"
+
+
 def mention(name: str, telegram_id: int | None) -> str:
     """Tag a participant in a group message. Without an id, return the plain name."""
 
@@ -159,12 +170,10 @@ def final_results_announcement(
     missing_note: str = "",
 ) -> str:
     by_place = {place: (name, telegram_id) for place, name, telegram_id in winners}
-    html_mode = any(telegram_id is not None for _, telegram_id in by_place.values())
-    shown_name = html.escape(tournament_name, quote=False) if html_mode else tournament_name
     lines = [
-        f"🏆 “{shown_name}” o‘z yakuniga yetdi!",
+        f"🏆 “{bold(tournament_name)}” o‘z yakuniga yetdi!",
         "",
-        "Turnir g‘oliblari:",
+        bold("Turnir g‘oliblari:"),
         "",
     ]
     for place in (1, 2, 3):
@@ -172,9 +181,8 @@ def final_results_announcement(
         if winner is None:
             continue
         name, telegram_id = winner
-        shown = mention(name, telegram_id) if html_mode else name
         medal = _PLACE_MEDALS[place]
-        lines.append(f"{medal} {place}-o‘rin: {shown}")
+        lines.append(f"{medal} {bold(f'{place}-o‘rin')}: {mention(name, telegram_id)}")
     if not any(place in by_place for place in (1, 2, 3)):
         lines.append("G‘oliblar aniqlanmadi.")
     if missing_note:

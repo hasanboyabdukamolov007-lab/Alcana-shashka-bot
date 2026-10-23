@@ -55,8 +55,9 @@ def test_uzbek_menu_and_prize_text() -> None:
         tournament_name="Alcana Print oylik shashka turniri",
         winners=[(1, "Yusufbek Ulug‘bekov", 501), (2, "Bilolxon Abdurahmonov", None)],
     )
-    assert closing.startswith("🏆 “Alcana Print oylik shashka turniri” o‘z yakuniga yetdi!")
-    assert '🥇 1-o‘rin: <a href="tg://user?id=501">Yusufbek Ulug‘bekov</a>' in closing
+    assert "Alcana Print oylik shashka turniri" in closing
+    assert "o‘z yakuniga yetdi!" in closing
+    assert '🥇 <b>1-o‘rin</b>: <a href="tg://user?id=501">Yusufbek Ulug‘bekov</a>' in closing
     assert "🥉" not in closing
     assert "yangi g‘alabalar tilaymiz" in closing
     assert notice.startswith("🎉 Assalomu alaykum, hurmatli “Alcana Print” jamoasi!")
