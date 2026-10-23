@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models import ConnectedGroup, TelegramMessage, Tournament
 from app.domain.enums import GroupMessageType, NotificationType, TournamentStatus
 from app.domain.exceptions import MessageNotFoundError
-from app.presentation.messages import split_text
+from app.presentation.messages import html_parse_mode, split_text
 from app.services.groups import mark_group_inactive
 from app.services.notifications import DeliveryError, enqueue
 from app.services.views import (
@@ -23,9 +23,7 @@ from app.services.views import (
 
 
 def _parse_mode(text: str) -> str | None:
-    if "<b>" in text or "tg://user?id=" in text:
-        return "HTML"
-    return None
+    return html_parse_mode(text)
 
 
 class GroupPublisher:

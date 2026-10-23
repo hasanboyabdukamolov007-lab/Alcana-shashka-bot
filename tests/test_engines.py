@@ -38,6 +38,8 @@ from app.presentation.messages import (
     money,
     prize_congratulations,
     registration_text,
+    standings_message,
+    standings_table,
 )
 
 
@@ -75,6 +77,56 @@ def test_uzbek_menu_and_prize_text() -> None:
     assert "Bahor" in text
     assert "1-o‘rin" in text
     assert "200 000 so‘m" in text
+
+
+def test_group_standings_table() -> None:
+    rows = [
+        (3, "Hasanboy Abdukamolov", 0, 0, "0", 0),
+        (9, "Юсуф Гройсмейстер ..", 0, 0, "0", 0),
+        (7, "abduvosid Groysmeyster 2", 0, 0, "0", 0),
+        (6, "Elbek Toğayev", 0, 0, "0", 0),
+        (12, "Sayyod Haydarov", 0, 0, "0", 0),
+        (5, "Sevinch Nodirova", 0, 0, "0", 0),
+        (4, "Акмалжон Тилаволдиев", 0, 0, "0", 0),
+        (10, "Шахринисо Баванова", 0, 0, "0", 0),
+        (8, "Ozodbek Qurbanov", 0, 0, "0", 0),
+        (2, "Bilolxoja Voxidov", 0, 0, "0", 0),
+        (11, "Alisher Ilhamov", 0, 0, "0", 0),
+        (1, "Avazbek Karimov", 0, 0, "0", 0),
+    ]
+    table = standings_table(rows)
+    lines = table.splitlines()
+    assert len(set(map(len, lines))) == 1
+    assert lines[0] == "№   Ishtirokchi                B  BH SB  G"
+    assert lines[2] == "03  Hasanboy Abdukamolov       0   0  0  0"
+    assert lines[4] == "07  abduvosid Groysmeyster 2   0   0  0  0"
+    assert lines[-1] == "01  Avazbek Karimov            0   0  0  0"
+    text = standings_message(
+        tournament_name="Shashka musobaqasi - Oktyabr, 2026",
+        provisional=True,
+        rows=rows,
+    )
+    assert text.startswith("🏆 <b>SHASHKA | OKTABR 2026</b>")
+    assert "📊 Jonli reyting (vaqtinchalik)" in text
+    assert f"<pre>{table}</pre>" in text
+    assert "<b>Belgilar:</b>" in text
+    assert "B — Ball" in text
+    assert "BH — Buchholz" in text
+    assert "SB — Sonneborn–Berger" in text
+    assert "G — G‘alabalar soni" in text
+    assert "👥 Ishtirokchilar: 12 nafar" in text
+    assert "🔄 Natijalar avtomatik yangilanadi." in text
+    other = standings_message(
+        tournament_name="Bahor kubogi",
+        provisional=False,
+        rows=[(1, "Ali <Valiyev>", 12, 8, "3.5", 4)],
+    )
+    assert "<b>Bahor kubogi</b>" in other
+    assert "vaqtinchalik" not in other
+    assert "Ali &lt;Valiyev&gt;" in other
+    assert "3.5" in other
+    wide = standings_table([(1, "Ali <Valiyev>", 12, 8, "3.5", 4)])
+    assert len(set(map(len, wide.splitlines()))) == 1
 
 
 def test_configuration_loading(monkeypatch: pytest.MonkeyPatch) -> None:

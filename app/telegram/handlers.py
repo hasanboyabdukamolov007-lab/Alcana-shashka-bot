@@ -19,7 +19,7 @@ from app.db.models import (
 )
 from app.domain.enums import NotificationStatus, TournamentStatus
 from app.domain.exceptions import AppError
-from app.presentation.messages import PARTICIPANT_MENU
+from app.presentation.messages import PARTICIPANT_MENU, html_parse_mode
 from app.services import flow
 from app.services.groups import (
     BotMembership,
@@ -884,7 +884,12 @@ async def _screen(message: Message, session) -> str:
 @participant_router.message(F.chat.type == "private", F.text.in_(PARTICIPANT_MENU))
 async def participant_menu(message: Message, session) -> None:
     text = await _screen(message, session)
-    await message.answer(text or "Buyruq tushunilmadi.", reply_markup=participant_reply_keyboard())
+    shown = text or "Buyruq tushunilmadi."
+    await message.answer(
+        shown,
+        reply_markup=participant_reply_keyboard(),
+        parse_mode=html_parse_mode(shown),
+    )
 
 
 @participant_router.message(Command("menu"))

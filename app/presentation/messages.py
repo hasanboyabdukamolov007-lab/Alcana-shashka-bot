@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import html
+import re
 
 from app.domain.enums import PRIZE_SLOTS
 
@@ -152,6 +153,132 @@ _PLACE_MEDALS = {1: "🥇", 2: "🥈", 3: "🥉"}
 
 def bold(text: str) -> str:
     return f"<b>{html.escape(text, quote=False)}</b>"
+
+
+def html_parse_mode(text: str) -> str | None:
+    if "<b>" in text or "<pre>" in text or "tg://user?id=" in text:
+        return "HTML"
+    return None
+
+
+_MONTHS = {
+    "sentyabr": "SENTYABR",
+    "sentabr": "SENTABR",
+    "yanvar": "YANVAR",
+    "fevral": "FEVRAL",
+    "mart": "MART",
+    "aprel": "APREL",
+    "may": "MAY",
+    "iyun": "IYUN",
+    "iyul": "IYUL",
+    "avgust": "AVGUST",
+    "oktyabr": "OKTABR",
+    "noyabr": "NOYABR",
+    "dekabr": "DEKABR",
+}
+_NAME_COLUMN_LIMIT = 32
+_STAT_GAPS = (3, 2, 1, 2)
+_STAT_HEADERS = ("B", "BH", "SB", "G")
+
+
+def standings_banner(tournament_name: str) -> str:
+    lowered = tournament_name.casefold()
+    year = re.search(r"20\d{2}", tournament_name)
+    month = next((label for name, label in _MONTHS.items() if name in lowered), None)
+    if month is not None and year is not None:
+        return bold(f"SHASHKA | {month} {year.group()}")
+    return bold(tournament_name)
+
+
+def _fit(text: str, width: int, *, align: str) -> str:
+    if len(text) > width:
+        text = text[: width - 1] + "…" if width > 1 else text[:width]
+    pad = width - len(text)
+    if align == "right":
+        return f"{' ' * pad}{text}"
+    return f"{text}{' ' * pad}"
+
+
+def _clip_name(name: str) -> str:
+    if len(name) <= _NAME_COLUMN_LIMIT:
+        return name
+    return f"{name[: _NAME_COLUMN_LIMIT - 1]}…"
+
+
+def standings_table(
+    rows: list[tuple[int | None, str, int, int, str, int]],
+) -> str:
+    names = [_clip_name(name) for _, name, *_rest in rows]
+    numbers = ["--" if number is None else str(number) for number, *_rest in rows]
+    stats = [
+        (str(points), str(buchholz), sonneborn, str(wins))
+        for _, _, points, buchholz, sonneborn, wins in rows
+    ]
+    number_width = max(2, *(len(item) for item in numbers))
+    name_width = max(len("Ishtirokchi"), *(len(item) for item in names))
+    stat_widths = [
+        max(len(header), *(len(item[index]) for item in stats))
+        for index, header in enumerate(_STAT_HEADERS)
+    ]
+    shown_numbers = [
+        "--".rjust(number_width) if number is None else f"{number:0{number_width}d}"
+        for number, *_rest in rows
+    ]
+
+    def assemble(number: str, name: str, values: tuple[str, str, str, str]) -> str:
+        pieces = [
+            _fit(number, number_width, align="left"),
+            "  ",
+            _fit(name, name_width, align="left"),
+        ]
+        for gap, value, width in zip(_STAT_GAPS, values, stat_widths, strict=True):
+            pieces.append(" " * gap)
+            pieces.append(_fit(value, width, align="right"))
+        return "".join(pieces)
+
+    header = assemble("№", "Ishtirokchi", _STAT_HEADERS)
+    body = [
+        assemble(number, name, values)
+        for number, name, values in zip(shown_numbers, names, stats, strict=True)
+    ]
+    rule = "─" * len(header)
+    return "\n".join([header, rule, *body])
+
+
+def standings_message(
+    *,
+    tournament_name: str,
+    provisional: bool,
+    rows: list[tuple[int | None, str, int, int, str, int]],
+    withdrawn: list[tuple[str, int]] | None = None,
+) -> str:
+    subtitle = "Jonli reyting (vaqtinchalik)" if provisional else "Jonli reyting"
+    lines = [f"🏆 {standings_banner(tournament_name)}", "", f"📊 {subtitle}", ""]
+    if not rows:
+        lines.append("Hali reyting yo‘q.")
+    else:
+        table = html.escape(standings_table(rows), quote=False)
+        lines.extend(
+            [
+                f"<pre>{table}</pre>",
+                "",
+                bold("Belgilar:"),
+                "B — Ball",
+                "BH — Buchholz",
+                "SB — Sonneborn–Berger",
+                "G — G‘alabalar soni",
+                "",
+                f"👥 Ishtirokchilar: {len(rows)} nafar",
+                "🔄 Natijalar avtomatik yangilanadi.",
+            ]
+        )
+    people = withdrawn or []
+    if people:
+        lines.extend(["", bold("Chiqarilgan ishtirokchilar"), "Mukofot yo‘q."])
+        for name, score in people:
+            safe = html.escape(name, quote=False)
+            lines.append(f"{safe} · {bold(str(score))} ball")
+    return "\n".join(lines).strip()
 
 
 def mention(name: str, telegram_id: int | None) -> str:

@@ -35,6 +35,7 @@ from app.presentation.messages import (
     mention,
     money,
     registration_text,
+    standings_message,
     status_label,
     unawarded_note,
 )
@@ -273,34 +274,30 @@ async def standings_text(session: AsyncSession, tournament: Tournament) -> str:
     )
     by_id = _participant_map(participants)
     provisional = tournament.status == TournamentStatus.ROUND_ACTIVE.value
-    lines = [bold(tournament.name), bold("📊 Jonli reyting")]
-    if provisional:
-        lines.append("Vaqtinchalik. Raund tugagach yangilanadi.")
-    lines.append("Teng balldagi ishtirokchilarning o‘rni bir xil.")
-    lines.append("")
-    if not rows:
-        lines.append("Hali reyting yo‘q.")
+    table_rows = []
     for row in rows:
         person = by_id[row.participant_id]
-        number = person.tournament_number if person.tournament_number is not None else "—"
-        lines.extend(
-            [
-                f"{bold(f'{row.rank}-o‘rin')} · {bold(f'{number}-raqam')}",
-                html.escape(person.display_name, quote=False),
-                f"Ball: {bold(str(row.points))} · BH {row.buchholz} · "
-                f"SB {row.sonneborn_berger:g} · G‘alaba {bold(str(row.real_wins))}",
-                "",
-            ]
+        table_rows.append(
+            (
+                person.tournament_number,
+                person.display_name,
+                row.points,
+                row.buchholz,
+                f"{row.sonneborn_berger:g}",
+                row.real_wins,
+            )
         )
-    withdrawn = [item for item in participants if item.status == ParticipantStatus.WITHDRAWN.value]
-    if withdrawn:
-        lines.append(bold("Chiqarilgan ishtirokchilar"))
-        lines.append("Mukofot yo‘q.")
-        for item in withdrawn:
-            name = html.escape(item.display_name, quote=False)
-            lines.append(f"{name} · {bold(str(item.score))} ball")
-            lines.append("")
-    return "\n".join(lines).strip()
+    withdrawn = [
+        (item.display_name, item.score)
+        for item in participants
+        if item.status == ParticipantStatus.WITHDRAWN.value
+    ]
+    return standings_message(
+        tournament_name=tournament.name,
+        provisional=provisional,
+        rows=table_rows,
+        withdrawn=withdrawn,
+    )
 
 
 async def tiebreak_public_text(session: AsyncSession, tournament: Tournament) -> str:
